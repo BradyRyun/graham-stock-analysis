@@ -25,6 +25,8 @@ export type YahooSymbolData = {
     returnOnEquity: number | null;
     dividendYield: number | null;
     regularMarketChangePercent: number | null;
+    sector: string | null;
+    industry: string | null;
   };
   dividends: { date: Date; amount: number }[];
 };
@@ -148,7 +150,12 @@ export class YahooFinanceClient {
           events: "dividends",
         }),
         this.yf.quoteSummary(symbol, {
-          modules: ["defaultKeyStatistics", "financialData", "summaryDetail"],
+          modules: [
+            "defaultKeyStatistics",
+            "financialData",
+            "summaryDetail",
+            "summaryProfile",
+          ],
         }),
       ]);
 
@@ -194,10 +201,14 @@ export class YahooFinanceClient {
     const asNum = (v: unknown): number | null =>
       typeof v === "number" && Number.isFinite(v) ? v : null;
 
-    const dividends = (chart.events?.dividends ?? []).map((d) => ({
-      date: d.date,
-      amount: d.amount,
-    }));
+    const dividends = Array.isArray(chart.events?.dividends)
+      ? chart.events.dividends
+          .filter((d) => d && d.date instanceof Date && typeof d.amount === "number")
+          .map((d) => ({
+            date: d.date,
+            amount: d.amount,
+          }))
+      : [];
 
     return {
       quarterlyRows,
@@ -212,6 +223,14 @@ export class YahooFinanceClient {
         regularMarketChangePercent: asNum(
           summary.summaryDetail?.regularMarketChangePercent
         ),
+        sector:
+          typeof summary.summaryProfile?.sector === "string"
+            ? summary.summaryProfile.sector
+            : null,
+        industry:
+          typeof summary.summaryProfile?.industry === "string"
+            ? summary.summaryProfile.industry
+            : null,
       },
     };
   }

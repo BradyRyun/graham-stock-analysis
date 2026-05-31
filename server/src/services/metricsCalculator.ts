@@ -1,4 +1,4 @@
-import type { MetricsPeriod } from "@stock-analyzer/shared";
+import type { MetricsPeriod, BuyModelResult } from "@stock-analyzer/shared";
 import type {
   MetricPoint,
   MetricValues,
@@ -121,6 +121,206 @@ function effectiveTaxRate(income: Record<string, number | null>): number {
   return rate;
 }
 
+function scorePe(value: number): number {
+  if (value <= 0) return 0;
+  if (value <= 12) return 1;
+  if (value <= 15) return 0.9;
+  if (value <= 20) return 0.7;
+  if (value <= 30) return 0.4;
+  if (value <= 50) return 0.15;
+  return 0;
+}
+
+function scoreCashFlowYield(value: number): number {
+  if (value < 0) return 0;
+  if (value >= 0.08) return 1;
+  if (value >= 0.06) return 0.9;
+  if (value >= 0.04) return 0.8;
+  if (value >= 0.02) return 0.5;
+  return 0.2;
+}
+
+function scoreRoic(value: number): number {
+  if (value < 0) return 0;
+  if (value >= 0.15) return 1;
+  if (value >= 0.12) return 0.9;
+  if (value >= 0.08) return 0.7;
+  if (value >= 0.05) return 0.4;
+  return 0.15;
+}
+
+function scoreRoe(value: number): number {
+  if (value < 0) return 0;
+  if (value >= 0.18) return 1;
+  if (value >= 0.12) return 0.85;
+  if (value >= 0.08) return 0.6;
+  if (value >= 0.03) return 0.3;
+  return 0.1;
+}
+
+function scorePriceToBook(value: number, financial: boolean): number {
+  if (value < 0) return 0;
+  if (financial) {
+    if (value < 1.0) return 1;
+    if (value < 1.5) return 0.9;
+    if (value < 2.5) return 0.75;
+    if (value < 4.0) return 0.4;
+    return 0.1;
+  }
+  if (value < 1.0) return 1;
+  if (value < 1.5) return 0.85;
+  if (value < 2.5) return 0.6;
+  if (value < 4.0) return 0.3;
+  return 0.1;
+}
+
+function scoreDebtToAssets(value: number): number {
+  if (value < 0) return 0;
+  if (value < 0.35) return 1;
+  if (value < 0.5) return 0.75;
+  if (value < 0.7) return 0.45;
+  return 0.15;
+}
+
+function scoreDividendGrowth(value: number): number {
+  if (value < 0) return 0;
+  if (value <= 0.12) return 1;
+  if (value <= 0.2) return 0.7;
+  if (value <= 0.35) return 0.35;
+  return 0.15;
+}
+
+function scoreSharpe(value: number): number {
+  if (value < 0) return 0.1;
+  if (value >= 1.0) return 1;
+  if (value >= 0.75) return 0.85;
+  if (value >= 0.5) return 0.65;
+  if (value >= 0.25) return 0.4;
+  return 0.2;
+}
+
+function isFinancialCompany(sector: string | null, industry: string | null): boolean {
+  const financialTerms = [
+    "bank",
+    "insurance",
+    "financial",
+    "fund",
+    "asset management",
+    "capital markets",
+    "brokerage",
+    "reinsurance",
+    "capital",
+  ];
+
+  const normalized = [sector, industry]
+    .filter(Boolean)
+    .map((value) => value!.toLowerCase());
+
+  return normalized.some((value) =>
+    financialTerms.some((term) => value.includes(term))
+  );
+}
+
+function gradeBuyScore(score: number): "don't buy" | "cautious buy" | "buy" | "strong buy" {
+  if (score >= 80) return "strong buy";
+  if (score >= 60) return "buy";
+  if (score >= 45) return "cautious buy";
+  return "don't buy";
+}
+
+function computeBuyModelResult(
+  current: MetricValues,
+  price: number | null,
+  quoteExtras: {
+    sector: string | null;
+    industry: string | null;
+  }
+): BuyModelResult {
+  const isFinancial = isFinancialCompany(quoteExtras.sector, quoteExtras.industry);
+  const model = isFinancial ? "financial" : "regular";
+
+  const netNet =
+    price !== null &&
+    current.grahamNcav !== null &&
+    current.grahamNcav > price;
+  if (netNet) {
+    return {
+      model,
+      score: 100,
+      grade: "strong buy",
+      note: "Graham Net-Net opportunity overrides the normal model.",
+    };
+  }
+
+  const weights: Record<string, number> = isFinancial
+    ? {
+        priceToBook: 0.3,
+        roe: 0.25,
+        debtToAssets: 0.2,
+        pe: 0.15,
+        dividendYieldGrowthYoY: 0.05,
+        sharpe: 0.05,
+      }
+    : {
+        cashFlowYield: 0.3,
+        roic: 0.2,
+        pe: 0.15,
+        priceToBook: 0.15,
+        debtToAssets: 0.1,
+        dividendYieldGrowthYoY: 0.05,
+        sharpe: 0.05,
+      };
+
+  let weightedScore = 0;
+  let availableWeight = 0;
+
+  for (const [key, weight] of Object.entries(weights)) {
+    const value = current[key as keyof MetricValues];
+    if (value === null) continue;
+
+    let metricScore = 0;
+    switch (key) {
+      case "pe":
+        metricScore = scorePe(value);
+        break;
+      case "cashFlowYield":
+        metricScore = scoreCashFlowYield(value);
+        break;
+      case "roic":
+        metricScore = scoreRoic(value);
+        break;
+      case "roe":
+        metricScore = scoreRoe(value);
+        break;
+      case "priceToBook":
+        metricScore = scorePriceToBook(value, isFinancial);
+        break;
+      case "debtToAssets":
+        metricScore = scoreDebtToAssets(value);
+        break;
+      case "dividendYieldGrowthYoY":
+        metricScore = scoreDividendGrowth(value);
+        break;
+      case "sharpe":
+        metricScore = scoreSharpe(value);
+        break;
+    }
+
+    weightedScore += metricScore * weight;
+    availableWeight += weight;
+  }
+
+  const score = availableWeight > 0 ? (weightedScore / availableWeight) * 100 : 50;
+  return {
+    model,
+    score: Math.round(score),
+    grade: gradeBuyScore(score),
+    note: isFinancial
+      ? "Financial company model selected based on sector or industry classification."
+      : "Regular company model selected based on sector and industry data.",
+  };
+}
+
 function computeMetricsForQuarter(
   row: YahooQuarterlyRow,
   quarterEndPrice: number | null,
@@ -215,6 +415,8 @@ function computeMetricsForQuarter(
     roe,
     roic,
     debtToAssets,
+    dividendYield: null,
+    dividendYieldGrowthYoY: null,
   };
 }
 
@@ -324,5 +526,9 @@ export async function calculateStockMetrics(
     ),
     current,
     history,
+    buyModel: computeBuyModelResult(current, currentPrice, {
+      sector: quoteExtras.sector,
+      industry: quoteExtras.industry,
+    }),
   };
 }

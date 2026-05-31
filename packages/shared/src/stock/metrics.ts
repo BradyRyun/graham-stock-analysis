@@ -26,6 +26,25 @@ export const MetricPoint = MetricValues.extend({
 });
 export type MetricPoint = z.infer<typeof MetricPoint>;
 
+export const BuyModelType = z.enum(["regular", "financial"]);
+export type BuyModelType = z.infer<typeof BuyModelType>;
+
+export const BuyModelGrade = z.enum([
+  "don't buy",
+  "cautious buy",
+  "buy",
+  "strong buy",
+]);
+export type BuyModelGrade = z.infer<typeof BuyModelGrade>;
+
+export const BuyModelResult = z.object({
+  model: BuyModelType,
+  score: z.number().min(0).max(100),
+  grade: BuyModelGrade,
+  note: z.string().nullable(),
+});
+export type BuyModelResult = z.infer<typeof BuyModelResult>;
+
 export const StockMetricsResponse = z.object({
   symbol: z.string(),
   asOf: z.string(),
@@ -34,6 +53,7 @@ export const StockMetricsResponse = z.object({
   priceChangePercentPeriod: nullableNumber,
   current: MetricValues,
   history: z.array(MetricPoint),
+  buyModel: BuyModelResult,
 });
 export type StockMetricsResponse = z.infer<typeof StockMetricsResponse>;
 

@@ -46,11 +46,12 @@ function priceOnOrBefore(
 }
 
 export function computeDividendMetrics(
-  dividends: DividendPayment[],
+  dividends: DividendPayment[] | null | undefined,
   prices: YahooPricePoint[],
   currentPrice: number | null,
   summaryYield: number | null
 ): DividendMetricsResult {
+  const normalizedDividends = Array.isArray(dividends) ? dividends : [];
   const noOp = () => null;
 
   const now = new Date();
@@ -59,8 +60,8 @@ export function computeDividendMetrics(
   const twoYearsAgo = new Date(now);
   twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
 
-  const ttmCurrent = sumDividendsBetween(dividends, oneYearAgo, now);
-  const ttmPrior = sumDividendsBetween(dividends, twoYearsAgo, oneYearAgo);
+  const ttmCurrent = sumDividendsBetween(normalizedDividends, oneYearAgo, now);
+  const ttmPrior = sumDividendsBetween(normalizedDividends, twoYearsAgo, oneYearAgo);
   const yieldFromSummary = normalizeDividendYield(summaryYield);
 
   const hasDividends =

@@ -94,6 +94,7 @@ export function Home() {
               priceChangePercentDay={data.priceChangePercentDay}
               priceChangePercentPeriod={data.priceChangePercentPeriod}
               period={validPeriod}
+              buyModel={data.buyModel}
             />
             <MetricsGrid current={data.current} price={data.price} />
             <MetricHistoryChart
