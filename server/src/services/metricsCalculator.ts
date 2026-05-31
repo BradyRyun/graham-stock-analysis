@@ -1,0 +1,328 @@
+import type { MetricsPeriod } from "@stock-analyzer/shared";
+import type {
+  MetricPoint,
+  MetricValues,
+  StockMetricsResponse,
+} from "@stock-analyzer/shared";
+import { computeDividendMetrics } from "./dividendMetrics.js";
+import type {
+  YahooFinanceClient,
+  YahooPricePoint,
+  YahooQuarterlyRow,
+} from "./yahooFinanceClient.js";
+
+function num(value: number | null | undefined): number | null {
+  if (value === undefined || value === null || !Number.isFinite(value)) {
+    return null;
+  }
+  return value;
+}
+
+function percentChange(current: number, prior: number): number | null {
+  if (!Number.isFinite(current) || !Number.isFinite(prior) || prior === 0) {
+    return null;
+  }
+  return (current - prior) / prior;
+}
+
+function periodStartDateKey(period: MetricsPeriod): string {
+  const d = new Date();
+  const years = period === "1y" ? 1 : 3;
+  d.setFullYear(d.getFullYear() - years);
+  return d.toISOString().slice(0, 10);
+}
+
+function computeDayChangePercent(
+  prices: YahooPricePoint[],
+  quoteDayChangePercent: number | null | undefined
+): number | null {
+  const quotePercent = num(quoteDayChangePercent);
+  if (quotePercent !== null) {
+    return num(quotePercent / 100);
+  }
+  if (prices.length >= 2) {
+    const last = prices[prices.length - 1]!.close;
+    const prev = prices[prices.length - 2]!.close;
+    return num(percentChange(last, prev));
+  }
+  return null;
+}
+
+function computePeriodChangePercent(
+  prices: YahooPricePoint[],
+  period: MetricsPeriod,
+  currentPrice: number | null
+): number | null {
+  const price = num(currentPrice);
+  if (price === null) return null;
+  const startPrice = priceOnOrBefore(prices, periodStartDateKey(period));
+  if (startPrice === null) return null;
+  return num(percentChange(price, startPrice));
+}
+
+function priceOnOrBefore(
+  prices: YahooPricePoint[],
+  fiscalDateEnding: string
+): number | null {
+  let best: number | null = null;
+  for (const p of prices) {
+    if (p.date <= fiscalDateEnding) {
+      best = p.close;
+    } else {
+      break;
+    }
+  }
+  return best;
+}
+
+function dailyReturns(prices: number[]): number[] {
+  const returns: number[] = [];
+  for (let i = 1; i < prices.length; i++) {
+    const prev = prices[i - 1];
+    if (prev === 0) continue;
+    returns.push((prices[i] - prev) / prev);
+  }
+  return returns;
+}
+
+function computeSharpe(
+  prices: YahooPricePoint[],
+  asOfDate: string,
+  riskFreeRate: number
+): number | null {
+  const idx = prices.findIndex((p) => p.date > asOfDate);
+  const sliceEnd = idx === -1 ? prices.length : idx;
+  const window = prices.slice(Math.max(0, sliceEnd - 253), sliceEnd);
+  if (window.length < 30) return null;
+
+  const closes = window.map((p) => p.close);
+  const returns = dailyReturns(closes);
+  if (returns.length < 2) return null;
+
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance =
+    returns.reduce((a, r) => a + (r - mean) ** 2, 0) / (returns.length - 1);
+  const std = Math.sqrt(variance);
+  if (std === 0) return null;
+
+  const annualizedReturn = mean * 252;
+  const annualizedStd = std * Math.sqrt(252);
+  return (annualizedReturn - riskFreeRate) / annualizedStd;
+}
+
+function effectiveTaxRate(income: Record<string, number | null>): number {
+  const tax = num(income.taxProvision);
+  const beforeTax = num(income.pretaxIncome);
+  if (tax === null || beforeTax === null || beforeTax === 0) {
+    return 0.21;
+  }
+  const rate = tax / beforeTax;
+  if (rate < 0 || rate > 1) return 0.21;
+  return rate;
+}
+
+function computeMetricsForQuarter(
+  row: YahooQuarterlyRow,
+  quarterEndPrice: number | null,
+  prices: YahooPricePoint[],
+  riskFreeRate: number
+): MetricValues {
+  const { income, balance, cashFlow } = row;
+
+  const shares =
+    num(balance.ordinarySharesNumber) ?? num(income.dilutedAverageShares);
+  const equity = num(balance.stockholdersEquity);
+  const totalAssets = num(balance.totalAssets);
+  const totalLiabilities = num(balance.totalLiabilitiesNetMinorityInterest);
+  const currentAssets = num(balance.currentAssets);
+  const currentLiabilities = num(balance.currentLiabilities);
+  const cash =
+    num(balance.cashAndCashEquivalents) ?? num(balance.cashFinancial);
+  const netIncome = num(income.netIncome);
+  const operatingIncome = num(income.operatingIncome);
+  const operatingCashflow = num(cashFlow.operatingCashFlow);
+
+  const eps =
+    netIncome !== null && shares !== null && shares !== 0
+      ? netIncome / shares
+      : null;
+
+  const bookValuePerShare =
+    equity !== null && shares !== null && shares !== 0
+      ? equity / shares
+      : null;
+
+  const grahamNcav =
+    currentAssets !== null &&
+    totalLiabilities !== null &&
+    shares !== null &&
+    shares !== 0
+      ? (currentAssets - totalLiabilities) / shares
+      : null;
+
+  const pe =
+    quarterEndPrice !== null && eps !== null && eps !== 0
+      ? quarterEndPrice / eps
+      : null;
+
+  const priceToBook =
+    quarterEndPrice !== null &&
+    bookValuePerShare !== null &&
+    bookValuePerShare !== 0
+      ? quarterEndPrice / bookValuePerShare
+      : null;
+
+  const roe =
+    netIncome !== null && equity !== null && equity !== 0
+      ? netIncome / equity
+      : null;
+
+  const taxRate = effectiveTaxRate(income);
+  const nopat =
+    operatingIncome !== null ? operatingIncome * (1 - taxRate) : null;
+  const investedCapital =
+    totalAssets !== null && currentLiabilities !== null && cash !== null
+      ? totalAssets - currentLiabilities - cash
+      : null;
+  const roic =
+    nopat !== null && investedCapital !== null && investedCapital !== 0
+      ? nopat / investedCapital
+      : null;
+
+  const debtToAssets =
+    totalLiabilities !== null && totalAssets !== null && totalAssets !== 0
+      ? totalLiabilities / totalAssets
+      : null;
+
+  const marketCap =
+    quarterEndPrice !== null && shares !== null
+      ? quarterEndPrice * shares
+      : null;
+  const cashFlowYield =
+    operatingCashflow !== null && marketCap !== null && marketCap !== 0
+      ? operatingCashflow / marketCap
+      : null;
+
+  const sharpe = computeSharpe(prices, row.fiscalDateEnding, riskFreeRate);
+
+  return {
+    pe,
+    sharpe,
+    cashFlowYield,
+    bookValuePerShare,
+    priceToBook,
+    grahamNcav,
+    roe,
+    roic,
+    debtToAssets,
+  };
+}
+
+export async function calculateStockMetrics(
+  client: YahooFinanceClient,
+  symbol: string,
+  period: MetricsPeriod,
+  riskFreeRate: number
+): Promise<StockMetricsResponse> {
+  const s = symbol.toUpperCase();
+  const { quarterlyRows, prices, quoteExtras, dividends } =
+    await client.getSymbolData(s, period);
+
+  const currentPrice =
+    prices.length > 0 ? prices[prices.length - 1].close : null;
+
+  const dividendMetrics = computeDividendMetrics(
+    dividends,
+    prices,
+    currentPrice,
+    quoteExtras.dividendYield
+  );
+
+  const history: MetricPoint[] = quarterlyRows.map((row) => {
+    const quarterEndPrice = priceOnOrBefore(prices, row.fiscalDateEnding);
+    const metrics = computeMetricsForQuarter(
+      row,
+      quarterEndPrice,
+      prices,
+      riskFreeRate
+    );
+    return {
+      fiscalDateEnding: row.fiscalDateEnding,
+      ...metrics,
+      dividendYield: dividendMetrics.quarterlyDividendYield(
+        row.fiscalDateEnding
+      ),
+      dividendYieldGrowthYoY: null,
+    };
+  });
+
+  let current: MetricValues = {
+    pe: null,
+    sharpe: null,
+    cashFlowYield: null,
+    bookValuePerShare: null,
+    priceToBook: null,
+    grahamNcav: null,
+    roe: null,
+    roic: null,
+    debtToAssets: null,
+    dividendYield: null,
+    dividendYieldGrowthYoY: null,
+  };
+
+  if (quarterlyRows.length > 0) {
+    const lastRow = quarterlyRows[quarterlyRows.length - 1];
+    current = computeMetricsForQuarter(
+      lastRow,
+      currentPrice ?? priceOnOrBefore(prices, lastRow.fiscalDateEnding),
+      prices,
+      riskFreeRate
+    );
+  }
+
+  if (quoteExtras.trailingPe !== null) {
+    current = { ...current, pe: quoteExtras.trailingPe };
+  }
+  if (quoteExtras.returnOnEquity !== null) {
+    current = { ...current, roe: quoteExtras.returnOnEquity };
+  }
+  if (quoteExtras.bookValue !== null) {
+    current = { ...current, bookValuePerShare: quoteExtras.bookValue };
+  }
+  if (quoteExtras.priceToBook !== null) {
+    current = { ...current, priceToBook: quoteExtras.priceToBook };
+  }
+
+  if (currentPrice !== null && history.length > 0) {
+    const asOf = quarterlyRows[quarterlyRows.length - 1]?.fiscalDateEnding;
+    if (asOf) {
+      current = {
+        ...current,
+        sharpe: computeSharpe(prices, asOf, riskFreeRate),
+      };
+    }
+  }
+
+  current = {
+    ...current,
+    dividendYield: dividendMetrics.dividendYield,
+    dividendYieldGrowthYoY: dividendMetrics.dividendYieldGrowthYoY,
+  };
+
+  return {
+    symbol: s,
+    asOf: new Date().toISOString(),
+    price: currentPrice,
+    priceChangePercentDay: computeDayChangePercent(
+      prices,
+      quoteExtras.regularMarketChangePercent
+    ),
+    priceChangePercentPeriod: computePeriodChangePercent(
+      prices,
+      period,
+      currentPrice
+    ),
+    current,
+    history,
+  };
+}

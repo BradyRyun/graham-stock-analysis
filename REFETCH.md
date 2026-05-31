@@ -1,0 +1,1 @@
+I want to add the ability to force refetching metrics when they are currently cached. There add to the @src/components/StockSymbolHeader.tsx a small button on the right side of the box that says refetch which will completely refetch the data from the third party API.

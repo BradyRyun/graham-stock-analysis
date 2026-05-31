@@ -1,0 +1,8 @@
+node_modules
+dist
+packages/shared/dist
+server/dist
+server/data
+.env
+.env.local
+*.db
