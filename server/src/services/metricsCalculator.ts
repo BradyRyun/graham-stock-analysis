@@ -485,6 +485,15 @@ export async function calculateStockMetrics(
 
   if (quoteExtras.trailingPe !== null) {
     current = { ...current, pe: quoteExtras.trailingPe };
+  } else if (
+    quoteExtras.trailingEps !== null &&
+    currentPrice !== null &&
+    currentPrice > 0
+  ) {
+    current = {
+      ...current,
+      pe: num(currentPrice / quoteExtras.trailingEps),
+    };
   }
   if (quoteExtras.returnOnEquity !== null) {
     current = { ...current, roe: quoteExtras.returnOnEquity };

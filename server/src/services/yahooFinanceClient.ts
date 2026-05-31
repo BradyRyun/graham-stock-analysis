@@ -20,6 +20,7 @@ export type YahooSymbolData = {
   prices: YahooPricePoint[];
   quoteExtras: {
     trailingPe: number | null;
+    trailingEps: number | null;
     priceToBook: number | null;
     bookValue: number | null;
     returnOnEquity: number | null;
@@ -230,6 +231,7 @@ export class YahooFinanceClient {
       dividends,
       quoteExtras: {
         trailingPe: asNum(stats?.trailingPE),
+        trailingEps: asNum(stats?.trailingEps),
         priceToBook: asNum(stats?.priceToBook),
         bookValue: asNum(stats?.bookValue),
         returnOnEquity: asNum(financial?.returnOnEquity),

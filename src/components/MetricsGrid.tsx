@@ -28,7 +28,6 @@ const RATING_METRIC_KEYS = new Set<MetricKey>([
   "pe",
   "sharpe",
   "cashFlowYield",
-  "bookValuePerShare",
   "priceToBook",
   "grahamNcav",
   "roe",

@@ -1,5 +1,4 @@
 import type { MetricKey } from "@stock-analyzer/shared";
-import { BVPS_ABOVE_PRICE_LABEL } from "@/lib/metricRating";
 
 export type MetricRatingTooltipTier = {
   label: string;
@@ -59,29 +58,6 @@ export const METRIC_RATING_TOOLTIPS: Partial<
         range: "Below 3% or negative",
         description:
           "Very expensive cash valuation, or the company is actively burning cash.",
-      },
-    ],
-  },
-  bookValuePerShare: {
-    title: "Book Value per Share (BVPS)",
-    tiers: [
-      {
-        label: BVPS_ABOVE_PRICE_LABEL,
-        range: "Higher than the current stock price",
-        description:
-          "You are buying the net assets at a discount.",
-      },
-      {
-        label: "Ok",
-        range: "Slightly lower than the stock price",
-        description:
-          "Normal for asset-light or service-based businesses.",
-      },
-      {
-        label: "Bad",
-        range: "Negative",
-        description:
-          "The company owes more liabilities than it owns in total assets.",
       },
     ],
   },
@@ -188,7 +164,7 @@ export const METRIC_RATING_TOOLTIPS: Partial<
       },
       {
         label: "Ok",
-        range: "0.40 to 0.60 (40%–60%)",
+        range: "0.40 to 0.70 (40%–70%)",
         description: "Moderate, healthy mix of debt and equity financing.",
       },
       {
