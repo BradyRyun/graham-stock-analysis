@@ -86,7 +86,7 @@ export class YahooFinanceClient {
   async searchSymbols(query: string) {
     const q = query.trim();
     return this.cached(`YAHOO:SEARCH:${q.toUpperCase()}`, async () => {
-      const result = await this.yf.search(q, { quotesCount: 10 });
+      const result = await this.yf.search(q, { quotesCount: 10, region: "US" });
       return (result.quotes ?? [])
         .filter(
           (item): item is typeof item & { symbol: string } =>

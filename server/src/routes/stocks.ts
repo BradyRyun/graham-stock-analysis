@@ -6,9 +6,11 @@ import {
 import { Router } from "express";
 import { calculateStockMetrics } from "../services/metricsCalculator.js";
 import type { YahooFinanceClient } from "../services/yahooFinanceClient.js";
+import type { PolygonClient } from "../services/polygonClient.js";
 
 export function createStocksRouter(
   yahooClient: YahooFinanceClient,
+  polygonClient: PolygonClient,
   riskFreeRate: number
 ): Router {
   const router = Router();
@@ -43,7 +45,8 @@ export function createStocksRouter(
         symbol,
         periodResult.data,
         riskFreeRate,
-        forceRefresh
+        forceRefresh,
+        polygonClient
       );
 
       res.json(StockMetricsResponse.parse(metrics));

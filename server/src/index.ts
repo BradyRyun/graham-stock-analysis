@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { createStocksRouter } from "./routes/stocks.js";
 import { CacheService } from "./services/cache.js";
 import { YahooFinanceClient } from "./services/yahooFinanceClient.js";
+import { PolygonClient } from "./services/polygonClient.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, "../../.env") });
@@ -21,6 +22,7 @@ const corsOrigin = process.env.CORS_ORIGIN;
 
 const cache = new CacheService(join(dataDir, "cache.db"));
 const yahooClient = new YahooFinanceClient(cache);
+const polygonClient = new PolygonClient(cache);
 
 const app = express();
 app.use(
@@ -48,7 +50,10 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-app.use("/api/stocks", createStocksRouter(yahooClient, riskFreeRate));
+app.use(
+  "/api/stocks",
+  createStocksRouter(yahooClient, polygonClient, riskFreeRate)
+);
 
 app.use(
   (

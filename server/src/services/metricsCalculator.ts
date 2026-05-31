@@ -10,6 +10,27 @@ import type {
   YahooPricePoint,
   YahooQuarterlyRow,
 } from "./yahooFinanceClient.js";
+import type { PolygonClient } from "./polygonClient.js";
+
+type SymbolQuoteExtras = {
+  trailingPe: number | null;
+  trailingEps: number | null;
+  priceToBook: number | null;
+  bookValue: number | null;
+  returnOnEquity: number | null;
+  dividendYield: number | null;
+  regularMarketChangePercent: number | null;
+  sector: string | null;
+  industry: string | null;
+  companyName: string | null;
+};
+
+type SymbolData = {
+  quarterlyRows: YahooQuarterlyRow[];
+  prices: YahooPricePoint[];
+  dividends: { date: Date; amount: number }[];
+  quoteExtras: SymbolQuoteExtras;
+};
 
 function num(value: number | null | undefined): number | null {
   if (value === undefined || value === null || !Number.isFinite(value)) {
@@ -119,6 +140,62 @@ function effectiveTaxRate(income: Record<string, number | null>): number {
   const rate = tax / beforeTax;
   if (rate < 0 || rate > 1) return 0.21;
   return rate;
+}
+
+function isMissingSymbolData(data: SymbolData): boolean {
+  const quote = data.quoteExtras;
+  const essentialQuoteValuesMissing =
+    quote.trailingPe === null &&
+    quote.trailingEps === null &&
+    quote.priceToBook === null &&
+    quote.bookValue === null &&
+    quote.returnOnEquity === null;
+
+  return (
+    data.quarterlyRows.length === 0 ||
+    data.prices.length === 0 ||
+    data.dividends.length === 0 ||
+    data.quoteExtras.companyName === null ||
+    data.quoteExtras.sector === null ||
+    data.quoteExtras.industry === null ||
+    essentialQuoteValuesMissing
+  );
+}
+
+function mergeSymbolData(primary: SymbolData, fallback: SymbolData): SymbolData {
+  const quoteExtras: SymbolQuoteExtras = {
+    trailingPe:
+      primary.quoteExtras.trailingPe ?? fallback.quoteExtras.trailingPe,
+    trailingEps:
+      primary.quoteExtras.trailingEps ?? fallback.quoteExtras.trailingEps,
+    priceToBook:
+      primary.quoteExtras.priceToBook ?? fallback.quoteExtras.priceToBook,
+    bookValue:
+      primary.quoteExtras.bookValue ?? fallback.quoteExtras.bookValue,
+    returnOnEquity:
+      primary.quoteExtras.returnOnEquity ?? fallback.quoteExtras.returnOnEquity,
+    dividendYield:
+      primary.quoteExtras.dividendYield ?? fallback.quoteExtras.dividendYield,
+    regularMarketChangePercent:
+      primary.quoteExtras.regularMarketChangePercent ??
+      fallback.quoteExtras.regularMarketChangePercent,
+    sector: primary.quoteExtras.sector ?? fallback.quoteExtras.sector,
+    industry: primary.quoteExtras.industry ?? fallback.quoteExtras.industry,
+    companyName:
+      primary.quoteExtras.companyName ?? fallback.quoteExtras.companyName,
+  };
+
+  return {
+    quarterlyRows:
+      primary.quarterlyRows.length > 0
+        ? primary.quarterlyRows
+        : fallback.quarterlyRows,
+    prices:
+      primary.prices.length > 0 ? primary.prices : fallback.prices,
+    dividends:
+      primary.dividends.length > 0 ? primary.dividends : fallback.dividends,
+    quoteExtras,
+  };
 }
 
 function scorePe(value: number): number {
@@ -425,11 +502,23 @@ export async function calculateStockMetrics(
   symbol: string,
   period: MetricsPeriod,
   riskFreeRate: number,
-  forceRefresh = false
+  forceRefresh = false,
+  fallbackClient?: PolygonClient
 ): Promise<StockMetricsResponse> {
   const s = symbol.toUpperCase();
-  const { quarterlyRows, prices, quoteExtras, dividends } =
-    await client.getSymbolData(s, period, forceRefresh);
+  const yahooResult = await client.getSymbolData(s, period, forceRefresh);
+  let symbolData: SymbolData = yahooResult;
+
+  if (fallbackClient && isMissingSymbolData(yahooResult)) {
+    const polygonResult = await fallbackClient.getSymbolData(
+      s,
+      period,
+      forceRefresh
+    );
+    symbolData = mergeSymbolData(yahooResult, polygonResult);
+  }
+
+  const { quarterlyRows, prices, quoteExtras, dividends } = symbolData;
 
   const currentPrice =
     prices.length > 0 ? prices[prices.length - 1].close : null;
