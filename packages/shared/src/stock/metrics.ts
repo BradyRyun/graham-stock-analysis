@@ -47,6 +47,7 @@ export type BuyModelResult = z.infer<typeof BuyModelResult>;
 
 export const StockMetricsResponse = z.object({
   symbol: z.string(),
+  companyName: z.string().nullable(),
   asOf: z.string(),
   price: nullableNumber,
   priceChangePercentDay: nullableNumber,

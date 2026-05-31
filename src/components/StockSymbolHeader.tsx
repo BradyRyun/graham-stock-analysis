@@ -1,11 +1,13 @@
 import type { BuyModelResult, MetricsPeriod } from "@stock-analyzer/shared";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { StarIcon } from "@radix-ui/react-icons";
 import { formatPercentChange, formatPrice } from "@/lib/formatPrice";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +19,10 @@ type StockSymbolHeaderProps = {
   priceChangePercentPeriod: number | null;
   period: MetricsPeriod;
   buyModel: BuyModelResult;
+  onRefetch: () => void;
+  isRefetching: boolean;
+  onToggleFavorite: () => void;
+  isFavorite: boolean;
 };
 
 function changeColorClass(value: number | null): string {
@@ -46,6 +52,10 @@ export function StockSymbolHeader({
   priceChangePercentPeriod,
   period,
   buyModel,
+  onRefetch,
+  isRefetching,
+  onToggleFavorite,
+  isFavorite,
 }: StockSymbolHeaderProps) {
   const periodLabel = period === "1y" ? "1Y" : "3Y";
 
@@ -61,12 +71,32 @@ export function StockSymbolHeader({
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-wrap items-center gap-3">
-          <CardTitle className="text-2xl">{symbol}</CardTitle>
-          <Badge variant="secondary">Equity</Badge>
-          <Badge variant={buyModel.model === "financial" ? "secondary" : "default"}>
-            {buyModel.model === "financial" ? "Financial Model" : "Regular Model"}
-          </Badge>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <CardTitle className="text-2xl">{symbol}</CardTitle>
+            <Badge variant="secondary">Equity</Badge>
+            <Badge variant={buyModel.model === "financial" ? "secondary" : "default"}>
+              {buyModel.model === "financial" ? "Financial Model" : "Regular Model"}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={isFavorite ? "golden" : "outline"}
+              onClick={onToggleFavorite}
+            >
+              <StarIcon className="mr-2 h-4 w-4" />
+              {isFavorite ? "Favorited" : "Add Favorite"}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRefetch}
+              disabled={isRefetching}
+            >
+              {isRefetching ? "Refetching..." : "Refetch"}
+            </Button>
+          </div>
         </div>
         <div className="flex flex-col gap-3">
           <span className="text-3xl font-semibold tabular-nums tracking-tight">

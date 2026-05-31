@@ -27,6 +27,7 @@ export type YahooSymbolData = {
     regularMarketChangePercent: number | null;
     sector: string | null;
     industry: string | null;
+    companyName: string | null;
   };
   dividends: { date: Date; amount: number }[];
 };
@@ -64,10 +65,13 @@ export class YahooFinanceClient {
   private async cached<T>(
     key: string,
     fetcher: () => Promise<T>,
-    ttlHours?: number
+    ttlHours?: number,
+    forceRefresh = false
   ): Promise<T> {
-    const hit = this.cache.get(key);
-    if (hit !== null) return hit as T;
+    if (!forceRefresh) {
+      const hit = this.cache.get(key);
+      if (hit !== null) return hit as T;
+    }
 
     const data = await fetcher();
     this.cache.set(
@@ -105,13 +109,15 @@ export class YahooFinanceClient {
 
   async getSymbolData(
     symbol: string,
-    period: MetricsPeriod
+    period: MetricsPeriod,
+    forceRefresh = false
   ): Promise<YahooSymbolData> {
     const s = symbol.toUpperCase();
     return this.cached(
       `YAHOO:SYMBOL_DATA:${s}:${period}`,
       () => this.fetchSymbolData(s, period),
-      12
+      12,
+      forceRefresh
     );
   }
 
@@ -155,6 +161,7 @@ export class YahooFinanceClient {
             "financialData",
             "summaryDetail",
             "summaryProfile",
+            "price",
           ],
         }),
       ]);
@@ -201,6 +208,13 @@ export class YahooFinanceClient {
     const asNum = (v: unknown): number | null =>
       typeof v === "number" && Number.isFinite(v) ? v : null;
 
+    const companyName =
+      typeof summary.price?.shortName === "string"
+        ? summary.price.shortName
+        : typeof summary.price?.longName === "string"
+        ? summary.price.longName
+        : null;
+
     const dividends = Array.isArray(chart.events?.dividends)
       ? chart.events.dividends
           .filter((d) => d && d.date instanceof Date && typeof d.amount === "number")
@@ -231,6 +245,7 @@ export class YahooFinanceClient {
           typeof summary.summaryProfile?.industry === "string"
             ? summary.summaryProfile.industry
             : null,
+        companyName,
       },
     };
   }

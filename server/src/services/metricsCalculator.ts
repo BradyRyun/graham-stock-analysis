@@ -424,11 +424,12 @@ export async function calculateStockMetrics(
   client: YahooFinanceClient,
   symbol: string,
   period: MetricsPeriod,
-  riskFreeRate: number
+  riskFreeRate: number,
+  forceRefresh = false
 ): Promise<StockMetricsResponse> {
   const s = symbol.toUpperCase();
   const { quarterlyRows, prices, quoteExtras, dividends } =
-    await client.getSymbolData(s, period);
+    await client.getSymbolData(s, period, forceRefresh);
 
   const currentPrice =
     prices.length > 0 ? prices[prices.length - 1].close : null;
@@ -513,6 +514,7 @@ export async function calculateStockMetrics(
 
   return {
     symbol: s,
+    companyName: quoteExtras.companyName ?? null,
     asOf: new Date().toISOString(),
     price: currentPrice,
     priceChangePercentDay: computeDayChangePercent(

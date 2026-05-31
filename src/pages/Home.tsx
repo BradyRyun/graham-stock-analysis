@@ -3,13 +3,16 @@ import {
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
 } from "@radix-ui/react-icons";
+import { useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MetricHistoryChart } from "@/components/MetricHistoryChart";
 import { MetricsGrid } from "@/components/MetricsGrid";
 import { MetricsLoadingSkeleton } from "@/components/MetricsLoadingSkeleton";
 import { PeriodToggle } from "@/components/PeriodToggle";
 import { StockSymbolHeader } from "@/components/StockSymbolHeader";
+import { FavoritesDropdown } from "@/components/FavoritesDropdown";
 import { TickerSearch } from "@/components/TickerSearch";
+import { useFavorites } from "@/hooks/useFavorites";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Empty,
@@ -28,18 +31,42 @@ export function Home() {
   const period = (searchParams.get("period") ?? "1y") as MetricsPeriod;
   const validPeriod: MetricsPeriod = period === "3y" ? "3y" : "1y";
 
-  const { data, isPending, isError, error } = useStockMetrics(
-    symbol,
-    validPeriod
-  );
+  const forceRefreshRef = useRef(false);
+  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const { data, isPending, isError, error, refetch, isRefetching } =
+    useStockMetrics(symbol, validPeriod, forceRefreshRef);
 
   const setSymbol = (next: string) => {
     setSearchParams({ symbol: next, period: validPeriod });
   };
 
+  const handleSelectFavorite = (favoriteSymbol: string) => {
+    setSymbol(favoriteSymbol);
+  };
+
+  const handleToggleFavorite = () => {
+    if (!data?.symbol) return;
+    toggleFavorite({
+      symbol: data.symbol,
+      name: data.companyName ?? data.symbol,
+    });
+  };
+
+  const currentIsFavorite = data ? isFavorite(data.symbol) : false;
+
   const setPeriod = (next: MetricsPeriod) => {
     if (symbol) {
       setSearchParams({ symbol, period: next });
+    }
+  };
+
+  const handleRefetch = async () => {
+    if (!symbol) return;
+    forceRefreshRef.current = true;
+    try {
+      await refetch();
+    } finally {
+      forceRefreshRef.current = false;
     }
   };
 
@@ -53,7 +80,13 @@ export function Home() {
               Fundamental metrics with quarterly history via Yahoo Finance
             </p>
           </div>
-          <PeriodToggle value={validPeriod} onChange={setPeriod} />
+          <div className="flex items-center gap-3">
+            <FavoritesDropdown
+              favorites={favorites}
+              onSelect={handleSelectFavorite}
+            />
+            <PeriodToggle value={validPeriod} onChange={setPeriod} />
+          </div>
         </header>
 
         <Separator />
@@ -95,6 +128,10 @@ export function Home() {
               priceChangePercentPeriod={data.priceChangePercentPeriod}
               period={validPeriod}
               buyModel={data.buyModel}
+              onRefetch={handleRefetch}
+              isRefetching={isRefetching}
+              onToggleFavorite={handleToggleFavorite}
+              isFavorite={currentIsFavorite}
             />
             <MetricsGrid current={data.current} price={data.price} />
             <MetricHistoryChart

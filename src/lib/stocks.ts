@@ -13,11 +13,12 @@ export async function searchStocks(query: string) {
 
 export async function fetchStockMetrics(
   symbol: string,
-  period: MetricsPeriod
+  period: MetricsPeriod,
+  forceRefresh = false
 ) {
   return api.get(
     `/api/stocks/${encodeURIComponent(symbol)}/metrics`,
     StockMetricsResponse,
-    { params: { period } }
+    { params: { period, forceRefresh } }
   );
 }

@@ -37,11 +37,13 @@ export function createStocksRouter(
         return;
       }
 
+      const forceRefresh = String(req.query.forceRefresh) === "true";
       const metrics = await calculateStockMetrics(
         yahooClient,
         symbol,
         periodResult.data,
-        riskFreeRate
+        riskFreeRate,
+        forceRefresh
       );
 
       res.json(StockMetricsResponse.parse(metrics));
