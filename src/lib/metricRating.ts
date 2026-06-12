@@ -90,8 +90,8 @@ export function rateMetric(
     }
     case "debtToAssets": {
       if (isNegative(value)) return "bad";
-      if (value < 0.4) return "good";
-      if (value >= 0.4 && value < 0.7) return "ok";
+      if (value < 0.5) return "good";
+      if (value >= 0.5 && value < 0.7) return "ok";
       if (value >= 0.7) return "bad";
       return "unknown";
     }

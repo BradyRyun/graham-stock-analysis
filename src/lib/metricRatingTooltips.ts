@@ -158,13 +158,13 @@ export const METRIC_RATING_TOOLTIPS: Partial<
     tiers: [
       {
         label: "Good",
-        range: "Below 0.40 (40%)",
+        range: "Below 0.50 (50%)",
         description:
           "More than half of the company's assets are financed via equity; low financial risk.",
       },
       {
         label: "Ok",
-        range: "0.40 to 0.70 (40%–70%)",
+        range: "0.50 to 0.70 (50%–70%)",
         description: "Moderate, healthy mix of debt and equity financing.",
       },
       {
