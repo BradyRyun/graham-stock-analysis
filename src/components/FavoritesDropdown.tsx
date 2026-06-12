@@ -1,15 +1,21 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { FavoriteStock } from "@/hooks/useFavorites";
 
 type FavoritesDropdownProps = {
   favorites: FavoriteStock[];
   onSelect: (symbol: string) => void;
+  onRemove: (symbol: string) => void;
 };
 
-export function FavoritesDropdown({ favorites, onSelect }: FavoritesDropdownProps) {
+export function FavoritesDropdown({
+  favorites,
+  onSelect,
+  onRemove,
+}: FavoritesDropdownProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -29,20 +35,32 @@ export function FavoritesDropdown({ favorites, onSelect }: FavoritesDropdownProp
             </div>
           ) : (
             favorites.map((favorite) => (
-              <button
+              <div
                 key={favorite.symbol}
-                type="button"
-                className="w-full px-4 py-3 text-left hover:bg-accent/70"
-                onClick={() => {
-                  onSelect(favorite.symbol);
-                  setOpen(false);
-                }}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-accent/70"
               >
-                <div className="font-medium">{favorite.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {favorite.symbol}
-                </div>
-              </button>
+                <Checkbox
+                  checked
+                  aria-label={`Remove ${favorite.symbol} from favorites`}
+                  onCheckedChange={(checked) => {
+                    if (!checked) onRemove(favorite.symbol);
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                />
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => {
+                    onSelect(favorite.symbol);
+                    setOpen(false);
+                  }}
+                >
+                  <div className="font-medium">{favorite.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {favorite.symbol}
+                  </div>
+                </button>
+              </div>
             ))
           )}
         </div>

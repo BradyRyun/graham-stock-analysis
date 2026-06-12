@@ -32,7 +32,8 @@ export function Home() {
   const validPeriod: MetricsPeriod = period === "3y" ? "3y" : "1y";
 
   const forceRefreshRef = useRef(false);
-  const { favorites, toggleFavorite, isFavorite } = useFavorites();
+  const { favorites, removeFavorite, toggleFavorite, isFavorite } =
+    useFavorites();
   const { data, isPending, isError, error, refetch, isRefetching } =
     useStockMetrics(symbol, validPeriod, forceRefreshRef);
 
@@ -84,6 +85,7 @@ export function Home() {
             <FavoritesDropdown
               favorites={favorites}
               onSelect={handleSelectFavorite}
+              onRemove={removeFavorite}
             />
             <PeriodToggle value={validPeriod} onChange={setPeriod} />
           </div>
@@ -126,6 +128,10 @@ export function Home() {
               price={data.price}
               priceChangePercentDay={data.priceChangePercentDay}
               priceChangePercentPeriod={data.priceChangePercentPeriod}
+              fiftyTwoWeekHigh={data.fiftyTwoWeekHigh}
+              fiftyTwoWeekLow={data.fiftyTwoWeekLow}
+              allTimeHigh={data.allTimeHigh}
+              allTimeHighSource={data.allTimeHighSource}
               period={validPeriod}
               buyModel={data.buyModel}
               onRefetch={handleRefetch}

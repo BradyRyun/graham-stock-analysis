@@ -20,6 +20,9 @@ type SymbolQuoteExtras = {
   returnOnEquity: number | null;
   dividendYield: number | null;
   regularMarketChangePercent: number | null;
+  fiftyTwoWeekHigh: number | null;
+  fiftyTwoWeekLow: number | null;
+  allTimeHigh: number | null;
   sector: string | null;
   industry: string | null;
   companyName: string | null;
@@ -67,6 +70,28 @@ function computeDayChangePercent(
     return num(percentChange(last, prev));
   }
   return null;
+}
+
+function computeFiftyTwoWeekRange(prices: YahooPricePoint[]): {
+  high: number | null;
+  low: number | null;
+} {
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const cutoff = oneYearAgo.toISOString().slice(0, 10);
+  const window = prices.filter((p) => p.date >= cutoff);
+  if (window.length === 0) {
+    return { high: null, low: null };
+  }
+
+  let high = window[0]!.close;
+  let low = window[0]!.close;
+  for (const point of window) {
+    if (point.close > high) high = point.close;
+    if (point.close < low) low = point.close;
+  }
+
+  return { high, low };
 }
 
 function computePeriodChangePercent(
@@ -179,6 +204,14 @@ function mergeSymbolData(primary: SymbolData, fallback: SymbolData): SymbolData 
     regularMarketChangePercent:
       primary.quoteExtras.regularMarketChangePercent ??
       fallback.quoteExtras.regularMarketChangePercent,
+    fiftyTwoWeekHigh:
+      primary.quoteExtras.fiftyTwoWeekHigh ??
+      fallback.quoteExtras.fiftyTwoWeekHigh,
+    fiftyTwoWeekLow:
+      primary.quoteExtras.fiftyTwoWeekLow ??
+      fallback.quoteExtras.fiftyTwoWeekLow,
+    allTimeHigh:
+      primary.quoteExtras.allTimeHigh ?? fallback.quoteExtras.allTimeHigh,
     sector: primary.quoteExtras.sector ?? fallback.quoteExtras.sector,
     industry: primary.quoteExtras.industry ?? fallback.quoteExtras.industry,
     companyName:
@@ -610,6 +643,23 @@ export async function calculateStockMetrics(
     dividendYieldGrowthYoY: dividendMetrics.dividendYieldGrowthYoY,
   };
 
+  const computedFiftyTwoWeekRange = computeFiftyTwoWeekRange(prices);
+
+  let allTimeHigh = quoteExtras.allTimeHigh;
+  let allTimeHighSource: "polygon" | "history" | null =
+    allTimeHigh !== null ? "history" : null;
+
+  if (fallbackClient) {
+    const polygonAllTimeHigh = await fallbackClient.getAllTimeHigh(
+      s,
+      forceRefresh
+    );
+    if (polygonAllTimeHigh !== null) {
+      allTimeHigh = polygonAllTimeHigh;
+      allTimeHighSource = "polygon";
+    }
+  }
+
   return {
     symbol: s,
     companyName: quoteExtras.companyName ?? null,
@@ -624,6 +674,12 @@ export async function calculateStockMetrics(
       period,
       currentPrice
     ),
+    fiftyTwoWeekHigh:
+      quoteExtras.fiftyTwoWeekHigh ?? computedFiftyTwoWeekRange.high,
+    fiftyTwoWeekLow:
+      quoteExtras.fiftyTwoWeekLow ?? computedFiftyTwoWeekRange.low,
+    allTimeHigh,
+    allTimeHighSource,
     current,
     history,
     buyModel: computeBuyModelResult(current, currentPrice, {

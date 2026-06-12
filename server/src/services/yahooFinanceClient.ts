@@ -26,6 +26,9 @@ export type YahooSymbolData = {
     returnOnEquity: number | null;
     dividendYield: number | null;
     regularMarketChangePercent: number | null;
+    fiftyTwoWeekHigh: number | null;
+    fiftyTwoWeekLow: number | null;
+    allTimeHigh: number | null;
     sector: string | null;
     industry: string | null;
     companyName: string | null;
@@ -46,6 +49,27 @@ function rowToNumbers(row: FundamentalsRow): Record<string, number | null> {
     }
   }
   return out;
+}
+
+function computeHistoricalHigh(
+  quotes: Array<{ high?: number; close?: number }>
+): number | null {
+  let maxHigh: number | null = null;
+
+  for (const quote of quotes) {
+    const high =
+      typeof quote.high === "number" && Number.isFinite(quote.high)
+        ? quote.high
+        : typeof quote.close === "number" && Number.isFinite(quote.close)
+          ? quote.close
+          : null;
+
+    if (high !== null && high > 0 && (maxHigh === null || high > maxHigh)) {
+      maxHigh = high;
+    }
+  }
+
+  return maxHigh;
 }
 
 function periodStartDate(period: MetricsPeriod): Date {
@@ -239,6 +263,13 @@ export class YahooFinanceClient {
         regularMarketChangePercent: asNum(
           summary.summaryDetail?.regularMarketChangePercent
         ),
+        fiftyTwoWeekHigh:
+          asNum(summary.summaryDetail?.fiftyTwoWeekHigh) ??
+          asNum(summary.price?.fiftyTwoWeekHigh),
+        fiftyTwoWeekLow:
+          asNum(summary.summaryDetail?.fiftyTwoWeekLow) ??
+          asNum(summary.price?.fiftyTwoWeekLow),
+        allTimeHigh: computeHistoricalHigh(chart.quotes ?? []),
         sector:
           typeof summary.summaryProfile?.sector === "string"
             ? summary.summaryProfile.sector

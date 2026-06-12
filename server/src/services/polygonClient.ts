@@ -22,6 +22,9 @@ export type PolygonSymbolData = {
     returnOnEquity: number | null;
     dividendYield: number | null;
     regularMarketChangePercent: number | null;
+    fiftyTwoWeekHigh: number | null;
+    fiftyTwoWeekLow: number | null;
+    allTimeHigh: number | null;
     sector: string | null;
     industry: string | null;
     companyName: string | null;
@@ -103,6 +106,19 @@ export class PolygonClient {
     });
   }
 
+  async getAllTimeHigh(
+    symbol: string,
+    forceRefresh = false
+  ): Promise<number | null> {
+    const s = symbol.toUpperCase();
+    return this.cached(
+      `POLYGON:ATH:${s}`,
+      () => this.fetchAllTimeHigh(s),
+      168,
+      forceRefresh
+    );
+  }
+
   async getSymbolData(
     symbol: string,
     period: MetricsPeriod,
@@ -153,11 +169,44 @@ export class PolygonClient {
           returnOnEquity: null,
           dividendYield: null,
           regularMarketChangePercent: null,
+          fiftyTwoWeekHigh: null,
+          fiftyTwoWeekLow: null,
+          allTimeHigh: null,
           sector: null,
           industry: null,
           companyName: null,
         },
       };
+    }
+  }
+
+  private async fetchAllTimeHigh(symbol: string): Promise<number | null> {
+    try {
+      const detailsUrl = `${this.baseUrl}/v3/reference/tickers/${symbol}?apikey=${this.apiKey}`;
+      const details = await this.fetch<{ results?: { list_date?: string } }>(
+        detailsUrl
+      );
+      const fromDate = details.results?.list_date ?? "1980-01-01";
+      const toDate = toDateKey(new Date());
+      const url = `${this.baseUrl}/v2/aggs/ticker/${symbol}/range/1/day/${fromDate}/${toDate}?sort=asc&limit=50000&adjusted=true&apikey=${this.apiKey}`;
+      const data = await this.fetch<{ results?: Array<{ h?: number }> }>(url);
+
+      let maxHigh: number | null = null;
+      for (const bar of data.results ?? []) {
+        if (
+          typeof bar.h === "number" &&
+          Number.isFinite(bar.h) &&
+          bar.h > 0 &&
+          (maxHigh === null || bar.h > maxHigh)
+        ) {
+          maxHigh = bar.h;
+        }
+      }
+
+      return maxHigh;
+    } catch (error) {
+      console.error(`Polygon ATH fetch error for ${symbol}:`, error);
+      return null;
     }
   }
 
@@ -262,6 +311,9 @@ export class PolygonClient {
           returnOnEquity: null,
           dividendYield: null,
           regularMarketChangePercent: null,
+          fiftyTwoWeekHigh: null,
+          fiftyTwoWeekLow: null,
+          allTimeHigh: null,
           sector: null,
           industry: null,
           companyName: null,
@@ -279,6 +331,9 @@ export class PolygonClient {
         returnOnEquity: asNum(ticker.fhk?.roe),
         dividendYield: asNum(ticker.fhk?.dividend_yield),
         regularMarketChangePercent: null, // Polygon doesn't provide this in ticker details
+        fiftyTwoWeekHigh: null,
+        fiftyTwoWeekLow: null,
+        allTimeHigh: null,
         sector: ticker.sic_description || null,
         industry: ticker.industry || null,
         companyName: ticker.name || null,
@@ -293,6 +348,9 @@ export class PolygonClient {
         returnOnEquity: null,
         dividendYield: null,
         regularMarketChangePercent: null,
+        fiftyTwoWeekHigh: null,
+        fiftyTwoWeekLow: null,
+        allTimeHigh: null,
         sector: null,
         industry: null,
         companyName: null,

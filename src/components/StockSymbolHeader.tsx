@@ -1,4 +1,8 @@
-import type { BuyModelResult, MetricsPeriod } from "@stock-analyzer/shared";
+import type {
+  BuyModelResult,
+  MetricsPeriod,
+  StockMetricsResponse,
+} from "@stock-analyzer/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,6 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { StarIcon } from "@radix-ui/react-icons";
+import { AllTimeHighPositionIndicator } from "@/components/AllTimeHighPositionIndicator";
+import { FiftyTwoWeekPositionIndicator } from "@/components/FiftyTwoWeekPositionIndicator";
 import { formatPercentChange, formatPrice } from "@/lib/formatPrice";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +23,10 @@ type StockSymbolHeaderProps = {
   price: number | null;
   priceChangePercentDay: number | null;
   priceChangePercentPeriod: number | null;
+  fiftyTwoWeekHigh: number | null;
+  fiftyTwoWeekLow: number | null;
+  allTimeHigh: number | null;
+  allTimeHighSource: StockMetricsResponse["allTimeHighSource"];
   period: MetricsPeriod;
   buyModel: BuyModelResult;
   onRefetch: () => void;
@@ -44,12 +54,30 @@ function PriceChange({ value, label }: PriceChangeProps) {
   );
 }
 
+type PriceLevelProps = {
+  value: number | null;
+  label: string;
+};
+
+function PriceLevel({ value, label }: PriceLevelProps) {
+  return (
+    <span className="text-sm font-medium tabular-nums">
+      <span className="font-normal text-muted-foreground">{label}</span>{" "}
+      {formatPrice(value)}
+    </span>
+  );
+}
+
 export function StockSymbolHeader({
   symbol,
   asOf,
   price,
   priceChangePercentDay,
   priceChangePercentPeriod,
+  fiftyTwoWeekHigh,
+  fiftyTwoWeekLow,
+  allTimeHigh,
+  allTimeHighSource,
   period,
   buyModel,
   onRefetch,
@@ -99,9 +127,21 @@ export function StockSymbolHeader({
           </div>
         </div>
         <div className="flex flex-col gap-3">
-          <span className="text-3xl font-semibold tabular-nums tracking-tight">
-            {formatPrice(price)}
-          </span>
+          <div className="flex flex-wrap items-end gap-3">
+            <span className="text-3xl font-semibold tabular-nums tracking-tight">
+              {formatPrice(price)}
+            </span>
+            <FiftyTwoWeekPositionIndicator
+              price={price}
+              fiftyTwoWeekHigh={fiftyTwoWeekHigh}
+              fiftyTwoWeekLow={fiftyTwoWeekLow}
+            />
+            <AllTimeHighPositionIndicator
+              price={price}
+              allTimeHigh={allTimeHigh}
+              allTimeHighSource={allTimeHighSource}
+            />
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={gradeVariant} className="text-base font-semibold">
               {buyModel.grade}
@@ -113,6 +153,9 @@ export function StockSymbolHeader({
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <PriceChange value={priceChangePercentDay} label="Day" />
             <PriceChange value={priceChangePercentPeriod} label={periodLabel} />
+            <PriceLevel value={fiftyTwoWeekHigh} label="52W High" />
+            <PriceLevel value={fiftyTwoWeekLow} label="52W Low" />
+            <PriceLevel value={allTimeHigh} label="ATH" />
           </div>
         </div>
         <CardDescription>
