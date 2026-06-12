@@ -1,20 +1,16 @@
 import type { MetricsPeriod } from "@stock-analyzer/shared";
-import {
-  ExclamationTriangleIcon,
-  MagnifyingGlassIcon,
-} from "@radix-ui/react-icons";
-import { useRef } from "react";
+import { MagnifyingGlassIcon } from "@radix-ui/react-icons";
 import { useSearchParams } from "react-router-dom";
 import { BusinessProfileCard } from "@/components/BusinessProfileCard";
 import { MetricHistoryChart } from "@/components/MetricHistoryChart";
+import { MetricHistoryChartSkeleton } from "@/components/MetricHistoryChartSkeleton";
 import { MetricsGrid } from "@/components/MetricsGrid";
-import { MetricsLoadingSkeleton } from "@/components/MetricsLoadingSkeleton";
+import { MetricsGridSkeleton } from "@/components/MetricsGridSkeleton";
 import { PeriodToggle } from "@/components/PeriodToggle";
 import { StockSymbolHeader } from "@/components/StockSymbolHeader";
 import { FavoritesDropdown } from "@/components/FavoritesDropdown";
 import { TickerSearch } from "@/components/TickerSearch";
 import { useFavorites } from "@/hooks/useFavorites";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Empty,
   EmptyDescription,
@@ -33,11 +29,8 @@ export function Home() {
   const period = (searchParams.get("period") ?? "1y") as MetricsPeriod;
   const validPeriod: MetricsPeriod = period === "3y" ? "3y" : "1y";
 
-  const forceRefreshRef = useRef(false);
-  const { favorites, removeFavorite, toggleFavorite, isFavorite } =
-    useFavorites();
-  const { data, isPending, isError, error, refetch, isRefetching } =
-    useStockMetrics(symbol, validPeriod, forceRefreshRef);
+  const { favorites, removeFavorite } = useFavorites();
+  const { data, isPending } = useStockMetrics(symbol, validPeriod);
   const {
     data: businessProfile,
     isPending: isBusinessProfilePending,
@@ -49,35 +42,13 @@ export function Home() {
     setSearchParams({ symbol: next, period: validPeriod });
   };
 
-  const handleSelectFavorite = (favoriteSymbol: string) => {
-    setSymbol(favoriteSymbol);
-  };
-
-  const handleToggleFavorite = () => {
-    if (!data?.symbol) return;
-    toggleFavorite({
-      symbol: data.symbol,
-      name: data.companyName ?? data.symbol,
-    });
-  };
-
-  const currentIsFavorite = data ? isFavorite(data.symbol) : false;
-
   const setPeriod = (next: MetricsPeriod) => {
     if (symbol) {
       setSearchParams({ symbol, period: next });
     }
   };
 
-  const handleRefetch = async () => {
-    if (!symbol) return;
-    forceRefreshRef.current = true;
-    try {
-      await refetch();
-    } finally {
-      forceRefreshRef.current = false;
-    }
-  };
+  const showMetricsSkeleton = Boolean(symbol && isPending && !data);
 
   return (
     <PageWrapper>
@@ -92,7 +63,7 @@ export function Home() {
           <div className="flex items-center gap-3">
             <FavoritesDropdown
               favorites={favorites}
-              onSelect={handleSelectFavorite}
+              onSelect={setSymbol}
               onRemove={removeFavorite}
             />
             <PeriodToggle value={validPeriod} onChange={setPeriod} />
@@ -118,49 +89,34 @@ export function Home() {
           </Empty>
         )}
 
-        {symbol && isPending && <MetricsLoadingSkeleton />}
-
-        {symbol && isError && (
-          <Alert variant="destructive">
-            <ExclamationTriangleIcon />
-            <AlertTitle>Could not load {symbol}</AlertTitle>
-            <AlertDescription>{error.message}</AlertDescription>
-          </Alert>
-        )}
-
-        {symbol && data && (
+        {symbol && (
           <div className="flex flex-col gap-8">
-            <StockSymbolHeader
-              symbol={data.symbol}
-              asOf={data.asOf}
-              price={data.price}
-              priceChangePercentDay={data.priceChangePercentDay}
-              priceChangePercentPeriod={data.priceChangePercentPeriod}
-              fiftyTwoWeekHigh={data.fiftyTwoWeekHigh}
-              fiftyTwoWeekLow={data.fiftyTwoWeekLow}
-              allTimeHigh={data.allTimeHigh}
-              allTimeHighSource={data.allTimeHighSource}
-              period={validPeriod}
-              buyModel={data.buyModel}
-              onRefetch={handleRefetch}
-              isRefetching={isRefetching}
-              onToggleFavorite={handleToggleFavorite}
-              isFavorite={currentIsFavorite}
-            />
+            <StockSymbolHeader symbol={symbol} period={validPeriod} />
+
             <BusinessProfileCard
               isPending={isBusinessProfilePending}
               isError={isBusinessProfileError}
               error={businessProfileError}
               data={businessProfile}
             />
-            <MetricsGrid current={data.current} price={data.price} />
-            <MetricHistoryChart
-              history={data.history}
-              current={{
-                fiscalDateEnding: data.asOf.slice(0, 10),
-                ...data.current,
-              }}
-            />
+
+            {data ? (
+              <MetricsGrid current={data.current} price={data.price} />
+            ) : showMetricsSkeleton ? (
+              <MetricsGridSkeleton />
+            ) : null}
+
+            {data ? (
+              <MetricHistoryChart
+                history={data.history}
+                current={{
+                  fiscalDateEnding: data.asOf.slice(0, 10),
+                  ...data.current,
+                }}
+              />
+            ) : showMetricsSkeleton ? (
+              <MetricHistoryChartSkeleton />
+            ) : null}
           </div>
         )}
       </div>

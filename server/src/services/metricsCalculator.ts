@@ -365,18 +365,18 @@ function computeBuyModelResult(
   const weights: Record<string, number> = isFinancial
     ? {
         priceToBook: 0.3,
-        roe: 0.25,
-        debtToAssets: 0.2,
+        roe: 0.20,
+        debtToAssets: 0.20,
         pe: 0.15,
         dividendYieldGrowthYoY: 0.05,
         sharpe: 0.05,
       }
     : {
-        cashFlowYield: 0.3,
-        roic: 0.2,
-        pe: 0.15,
+        cashFlowYield: 0.25,
+        roic: 0.15,
+        pe: 0.20,
         priceToBook: 0.15,
-        debtToAssets: 0.1,
+        debtToAssets: 0.15,
         dividendYieldGrowthYoY: 0.05,
         sharpe: 0.05,
       };
