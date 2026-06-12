@@ -5,6 +5,7 @@ import {
 } from "@radix-ui/react-icons";
 import { useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { BusinessProfileCard } from "@/components/BusinessProfileCard";
 import { MetricHistoryChart } from "@/components/MetricHistoryChart";
 import { MetricsGrid } from "@/components/MetricsGrid";
 import { MetricsLoadingSkeleton } from "@/components/MetricsLoadingSkeleton";
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/empty";
 import { PageWrapper } from "@/components/ui/page-wrapper";
 import { Separator } from "@/components/ui/separator";
+import { useBusinessProfile } from "@/hooks/useBusinessProfile";
 import { useStockMetrics } from "@/hooks/useStockMetrics";
 
 export function Home() {
@@ -36,6 +38,12 @@ export function Home() {
     useFavorites();
   const { data, isPending, isError, error, refetch, isRefetching } =
     useStockMetrics(symbol, validPeriod, forceRefreshRef);
+  const {
+    data: businessProfile,
+    isPending: isBusinessProfilePending,
+    isError: isBusinessProfileError,
+    error: businessProfileError,
+  } = useBusinessProfile(symbol);
 
   const setSymbol = (next: string) => {
     setSearchParams({ symbol: next, period: validPeriod });
@@ -138,6 +146,12 @@ export function Home() {
               isRefetching={isRefetching}
               onToggleFavorite={handleToggleFavorite}
               isFavorite={currentIsFavorite}
+            />
+            <BusinessProfileCard
+              isPending={isBusinessProfilePending}
+              isError={isBusinessProfileError}
+              error={businessProfileError}
+              data={businessProfile}
             />
             <MetricsGrid current={data.current} price={data.price} />
             <MetricHistoryChart

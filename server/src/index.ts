@@ -5,6 +5,8 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createStocksRouter } from "./routes/stocks.js";
+import { BusinessProfileService } from "./services/businessProfileService.js";
+import { createGeminiClientFromEnv } from "./services/geminiClient.js";
 import { CacheService } from "./services/cache.js";
 import { YahooFinanceClient } from "./services/yahooFinanceClient.js";
 import { PolygonClient } from "./services/polygonClient.js";
@@ -23,6 +25,11 @@ const corsOrigin = process.env.CORS_ORIGIN;
 const cache = new CacheService(join(dataDir, "cache.db"));
 const yahooClient = new YahooFinanceClient(cache);
 const polygonClient = new PolygonClient(cache);
+
+const geminiClient = createGeminiClientFromEnv();
+const businessProfileService = geminiClient
+  ? new BusinessProfileService(dataDir, geminiClient, yahooClient)
+  : null;
 
 const app = express();
 app.use(
@@ -52,7 +59,12 @@ app.get("/health", (_req, res) => {
 
 app.use(
   "/api/stocks",
-  createStocksRouter(yahooClient, polygonClient, riskFreeRate)
+  createStocksRouter(
+    yahooClient,
+    polygonClient,
+    riskFreeRate,
+    businessProfileService
+  )
 );
 
 app.use(

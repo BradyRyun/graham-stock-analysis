@@ -1,9 +1,11 @@
 import {
+  BusinessProfileResponse,
   MetricsPeriod,
   StockMetricsResponse,
   StockSearchResponse,
 } from "@stock-analyzer/shared";
 import { Router } from "express";
+import type { BusinessProfileService } from "../services/businessProfileService.js";
 import { calculateStockMetrics } from "../services/metricsCalculator.js";
 import type { YahooFinanceClient } from "../services/yahooFinanceClient.js";
 import type { PolygonClient } from "../services/polygonClient.js";
@@ -11,7 +13,8 @@ import type { PolygonClient } from "../services/polygonClient.js";
 export function createStocksRouter(
   yahooClient: YahooFinanceClient,
   polygonClient: PolygonClient,
-  riskFreeRate: number
+  riskFreeRate: number,
+  businessProfileService: BusinessProfileService | null
 ): Router {
   const router = Router();
 
@@ -50,6 +53,24 @@ export function createStocksRouter(
       );
 
       res.json(StockMetricsResponse.parse(metrics));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  router.get("/:symbol/business-profile", async (req, res, next) => {
+    try {
+      if (!businessProfileService) {
+        res.status(503).json({
+          message:
+            "Business profiles are unavailable. Set GEMINI_API_KEY or configure GOOGLE_APPLICATION_CREDENTIALS with GCP_PROJECT_ID for Vertex AI.",
+        });
+        return;
+      }
+
+      const symbol = String(req.params.symbol).toUpperCase();
+      const profile = await businessProfileService.getBusinessProfile(symbol);
+      res.json(BusinessProfileResponse.parse(profile));
     } catch (e) {
       next(e);
     }

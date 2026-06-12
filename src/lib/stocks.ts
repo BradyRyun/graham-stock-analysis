@@ -1,4 +1,5 @@
 import {
+  BusinessProfileResponse,
   MetricsPeriod,
   StockMetricsResponse,
   StockSearchResponse,
@@ -20,5 +21,12 @@ export async function fetchStockMetrics(
     `/api/stocks/${encodeURIComponent(symbol)}/metrics`,
     StockMetricsResponse,
     { params: { period, forceRefresh } }
+  );
+}
+
+export async function fetchBusinessProfile(symbol: string) {
+  return api.get(
+    `/api/stocks/${encodeURIComponent(symbol)}/business-profile`,
+    BusinessProfileResponse
   );
 }
