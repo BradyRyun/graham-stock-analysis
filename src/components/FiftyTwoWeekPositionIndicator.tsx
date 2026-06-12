@@ -31,7 +31,7 @@ export function FiftyTwoWeekPositionIndicator({
   }
 
   const { position, closerTo, percentOfRange } = data;
-  const isNearHigh = closerTo === "high";
+  const isNearHigh = closerTo === "high" && percentOfRange > 70;
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -39,7 +39,7 @@ export function FiftyTwoWeekPositionIndicator({
         <TooltipTrigger asChild>
           <div className="flex flex-col gap-1.5 pb-0.5">
             <Badge
-              variant={isNearHigh ? "success" : "destructive"}
+              variant={isNearHigh ? "destructive" : "success"}
               className="w-fit text-[11px] font-medium"
             >
               {isNearHigh ? "Near 52W High" : "Near 52W Low"}
